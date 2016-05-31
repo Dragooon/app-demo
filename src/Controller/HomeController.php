@@ -1,0 +1,24 @@
+<?php
+namespace CSVTest\Controller;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Slim\Views\Twig;
+
+class HomeController
+{
+    /**
+     * @var Twig
+     */
+    protected $view;
+
+    public function __construct(Twig $view)
+    {
+        $this->view = $view;
+    }
+
+    public function __invoke(ServerRequestInterface $request, ResponseInterface $response)
+    {
+        return $this->view->render($response, 'input.twig');
+    }
+}
