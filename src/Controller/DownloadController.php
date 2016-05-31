@@ -31,6 +31,9 @@ class DownloadController
                     ->withAddedHeader('Content-disposition', 'attachment; filename="output.' . pathinfo($args['code'], PATHINFO_EXTENSION) . '"')
                     ->withAddedHeader('Content-length', filesize($file));
                 $response->getBody()->write(file_get_contents($file));
+
+                @unlink($file);
+                
                 return $response;
             }
         }
