@@ -36,48 +36,56 @@ class UploadController
             $file = $files['file'];
             $extension = pathinfo($file->getClientFilename(), PATHINFO_EXTENSION);
             $filename = $hash . '.' . $extension;
-            $file->moveTo('cache/' . $filename);
 
-            $phpExcel = \PHPExcel_IOFactory::load('cache/' . $filename);
-            $data = $phpExcel->getActiveSheet()->toArray();
-            $data = array_splice($data, 3);
-            $output = [
-                ['Year', 'Make', 'Model', 'MSRP', 'Sale Price', 'Savings off MSRP', '% Savings'],
-            ];
+            try {
+                $file->moveTo('cache/' . $filename);
 
-            $current_row = [];
-            foreach ($data as $row) {
-                foreach ($row as $k => $value) {
-                    if (!empty($value)) {
-                        $current_row[$k] = $value;
+                $phpExcel = \PHPExcel_IOFactory::load('cache/' . $filename);
+                $data = $phpExcel->getActiveSheet()->toArray();
+                $data = array_splice($data, 3);
+                $output = [
+                    ['Year', 'Make', 'Model', 'MSRP', 'Sale Price', 'Savings off MSRP', '% Savings'],
+                ];
+
+                $current_row = [];
+                foreach ($data as $row) {
+                    foreach ($row as $k => $value) {
+                        if (!empty($value)) {
+                            $current_row[$k] = $value;
+                        }
                     }
+
+                    $newRow = [];
+                    $keys = [2, 0, 1, 4, 3, 5];
+                    foreach ($keys as $destination => $current) {
+                        $newRow[$destination] = $current_row[$current];
+                    }
+
+                    $newRow[6] = ((float)str_replace(',', '', $newRow[5]) / (float)str_replace(',', '', $newRow[3])) * 100;
+                    $newRow[6] = substr((string)$newRow[6], 0, strpos((string)$newRow[6], '.') + 3) . '%';
+                    $newRow[3] = '$' . $newRow[3];
+                    $newRow[4] = '$' . $newRow[4];
+                    $newRow[5] = '$' . $newRow[5];
+
+                    $output[] = $newRow;
                 }
 
-                $newRow = [];
-                $keys = [2, 0, 1, 4, 3, 5];
-                foreach ($keys as $destination => $current) {
-                    $newRow[$destination] = $current_row[$current];
-                }
+                $doc = new \PHPExcel();
+                $doc->setActiveSheetIndex(0);
+                $doc->getActiveSheet()->fromArray($output);
 
-                $newRow[6] = ((float) str_replace(',', '', $newRow[5]) / (float) str_replace(',', '', $newRow[3])) * 100;
-                $newRow[6] = substr((string) $newRow[6], 0, strpos((string) $newRow[6], '.') + 3) . '%';
-                $newRow[3] = '$' . $newRow[3];
-                $newRow[4] = '$' . $newRow[4];
-                $newRow[5] = '$' . $newRow[5];
-
-                $output[] = $newRow;
+                @unlink('cache/' . $filename);
+                \PHPExcel_IOFactory::createWriter($doc, $type == 'csv' ? 'CSV' : 'Excel2007')->save('cache/' . $hash . '.' . $type);
+                
+                return $response
+                    ->withJson([
+                        'code' => $hash,
+                    ]);
             }
-            
-            $doc = new \PHPExcel();
-            $doc->setActiveSheetIndex(0);
-            $doc->getActiveSheet()->fromArray($output);
-            @unlink('cache/' . $filename);
-            \PHPExcel_IOFactory::createWriter($doc, $type == 'csv' ? 'CSV' : 'Excel2007')->save('cache/' . $hash . '.' . $type);
-
-            return $response
-                ->withJson([
-                    'code' => $hash,
-                ]);
+            catch (\Exception $e) {
+                @unlink('cache/' . $filename);
+                throw $e;
+            }
         }
         catch (\Exception $e) {
             return $response
